@@ -4,11 +4,11 @@ WebIntel is a Python web intelligence platform that crawls public company websit
 extracts structured business and technical data, stores it in PostgreSQL, and exposes
 searchable APIs through FastAPI.
 
-The repository currently implements **Phases 1 through 4** of the project plan: the
+The repository currently implements **Phases 1 through 5** of the project plan: the
 application foundation, PostgreSQL and Redis infrastructure, configuration, structured
 logging, health/readiness endpoints, the relational data model, Alembic migrations,
 async repositories, the crawl-job API with Celery dispatch, canonical URL handling,
-and link extraction.
+link extraction, and structured HTML parsing.
 
 ## Requirements
 
@@ -114,13 +114,28 @@ Phase 6 fetcher must run this check for every redirect and bind the validated ad
 to the connection; validation followed by an unrelated DNS lookup would remain
 vulnerable to DNS rebinding.
 
+## HTML Extraction
+
+`parse_html` converts complete or malformed HTML into a `ParsedPage` containing:
+
+- title and meta description, with Open Graph description fallback
+- ordered H1-H3 headings
+- unique visible and `mailto:` emails with asset-like false positives removed
+- normalized social profile links with sharing/content URLs excluded
+- conservative important-page candidates with confidence scores
+- normalized internal and external links
+- a bounded visible-text preview excluding scripts, styles, templates, and comments
+
+Important-page detection favors navigation hubs. For example, `/careers` is a careers
+page, while `/careers/backend-engineer` is not automatically mislabeled as the hub.
+
 ## Delivery Roadmap
 
 1. Application and infrastructure foundation (implemented)
 2. SQLAlchemy models, Alembic migrations, and repositories (implemented)
 3. Crawl-job API and Celery dispatch (implemented)
 4. URL normalization with SSRF protections and link extraction (implemented)
-5. HTML parsing and business-data extraction
+5. HTML parsing and business-data extraction (implemented)
 6. Resilient HTTP fetching and robots.txt enforcement
 7. Crawl worker persistence and failure handling
 8. Search, filtering, technology detection, CI, and documentation polish
