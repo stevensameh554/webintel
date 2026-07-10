@@ -1,7 +1,7 @@
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 
 import pytest
-from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 
 from app.api.routes import health
 from app.core.config import Settings
@@ -9,14 +9,20 @@ from app.main import create_app
 
 
 @pytest.fixture
-def client() -> Iterator[TestClient]:
+async def client() -> AsyncIterator[AsyncClient]:
     settings = Settings(_env_file=None, environment="test")
-    with TestClient(create_app(settings)) as test_client:
+    application = create_app(settings)
+    application.state.settings = settings
+    application.state.database_engine = object()
+    application.state.redis = object()
+    transport = ASGITransport(app=application)
+    async with AsyncClient(transport=transport, base_url="http://test") as test_client:
         yield test_client
 
 
-def test_health_returns_service_metadata(client: TestClient) -> None:
-    response = client.get("/health")
+@pytest.mark.asyncio
+async def test_health_returns_service_metadata(client: AsyncClient) -> None:
+    response = await client.get("/health")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -25,8 +31,9 @@ def test_health_returns_service_metadata(client: TestClient) -> None:
     }
 
 
-def test_ready_when_dependencies_are_available(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.asyncio
+async def test_ready_when_dependencies_are_available(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     async def available(_dependency: object) -> health.CheckResult:
         return {"status": "up", "detail": None}
@@ -34,14 +41,15 @@ def test_ready_when_dependencies_are_available(
     monkeypatch.setattr(health, "check_postgresql", available)
     monkeypatch.setattr(health, "check_redis", available)
 
-    response = client.get("/ready")
+    response = await client.get("/ready")
 
     assert response.status_code == 200
     assert response.json()["data"]["status"] == "ready"
 
 
-def test_not_ready_when_a_dependency_is_unavailable(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.asyncio
+async def test_not_ready_when_a_dependency_is_unavailable(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     async def database_down(_dependency: object) -> health.CheckResult:
         return {"status": "down", "detail": "ConnectionError"}
@@ -52,7 +60,7 @@ def test_not_ready_when_a_dependency_is_unavailable(
     monkeypatch.setattr(health, "check_postgresql", database_down)
     monkeypatch.setattr(health, "check_redis", redis_up)
 
-    response = client.get("/ready")
+    response = await client.get("/ready")
 
     assert response.status_code == 503
     assert response.json()["success"] is False

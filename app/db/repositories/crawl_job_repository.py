@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import CrawlJob, CrawlJobStatus
@@ -23,13 +23,33 @@ class CrawlJobRepository:
         return await self.session.get(CrawlJob, job_id)
 
     async def list(
-        self, *, website_id: uuid.UUID | None = None, offset: int = 0, limit: int = 50
+        self,
+        *,
+        website_id: uuid.UUID | None = None,
+        status: CrawlJobStatus | None = None,
+        offset: int = 0,
+        limit: int = 50,
     ) -> list[CrawlJob]:
         statement: Select[tuple[CrawlJob]] = select(CrawlJob)
         if website_id is not None:
             statement = statement.where(CrawlJob.website_id == website_id)
+        if status is not None:
+            statement = statement.where(CrawlJob.status == status)
         statement = statement.order_by(CrawlJob.created_at.desc()).offset(offset).limit(limit)
         return list((await self.session.scalars(statement)).all())
+
+    async def count(
+        self,
+        *,
+        website_id: uuid.UUID | None = None,
+        status: CrawlJobStatus | None = None,
+    ) -> int:
+        statement = select(func.count()).select_from(CrawlJob)
+        if website_id is not None:
+            statement = statement.where(CrawlJob.website_id == website_id)
+        if status is not None:
+            statement = statement.where(CrawlJob.status == status)
+        return int((await self.session.scalar(statement)) or 0)
 
     async def mark_running(self, job: CrawlJob) -> CrawlJob:
         job.status = CrawlJobStatus.RUNNING

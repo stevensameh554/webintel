@@ -24,6 +24,7 @@ class Settings(BaseSettings):
         default="postgresql+asyncpg://webintel:webintel@localhost:5432/webintel"
     )
     redis_url: str = "redis://localhost:6379/0"
+    crawl_queue_name: str = "crawl_jobs"
     database_pool_size: int = Field(default=5, ge=1, le=50)
     readiness_timeout_seconds: float = Field(default=2.0, gt=0, le=10)
 

@@ -5,8 +5,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from redis.asyncio import Redis
 
+from app.api.routes.crawl_jobs import router as crawl_jobs_router
 from app.api.routes.health import router as health_router
 from app.core.config import Settings, get_settings
+from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
 from app.db.session import create_database_engine, create_session_factory
 
@@ -37,7 +39,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         description="Company website crawling and intelligence API",
         lifespan=lifespan,
     )
+    register_error_handlers(application)
     application.include_router(health_router)
+    application.include_router(crawl_jobs_router)
     return application
 
 
