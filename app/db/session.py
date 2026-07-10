@@ -1,4 +1,12 @@
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from collections.abc import AsyncIterator
+
+from fastapi import Request
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from app.core.config import Settings
 
@@ -9,3 +17,12 @@ def create_database_engine(settings: Settings) -> AsyncEngine:
         pool_pre_ping=True,
         pool_size=settings.database_pool_size,
     )
+
+
+def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(engine, expire_on_commit=False, autoflush=False)
+
+
+async def get_database_session(request: Request) -> AsyncIterator[AsyncSession]:
+    async with request.app.state.session_factory() as session:
+        yield session
