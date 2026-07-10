@@ -1,10 +1,10 @@
-import ipaddress
 from dataclasses import dataclass
-from urllib.parse import SplitResult, urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import status
 
 from app.core.errors import AppError
+from app.services.crawler.url_normalizer import UrlNormalizationError, normalize_url
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,32 +23,13 @@ def _validation_error(message: str) -> AppError:
 
 
 def normalize_crawl_target(raw_url: str) -> NormalizedTarget:
-    parsed = urlsplit(raw_url)
-    if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
-        raise _validation_error("URL must use HTTP or HTTPS and include a hostname")
-    if parsed.username or parsed.password:
-        raise _validation_error("URLs containing credentials are not allowed")
-
     try:
-        hostname = parsed.hostname.rstrip(".").encode("idna").decode("ascii").lower()
-        port = parsed.port
-    except (UnicodeError, ValueError) as exc:
-        raise _validation_error("URL contains an invalid hostname or port") from exc
+        start_url = normalize_url(raw_url, reject_non_public_ip=True)
+    except UrlNormalizationError as exc:
+        raise _validation_error(str(exc)) from exc
 
-    if hostname == "localhost" or hostname.endswith(".localhost"):
-        raise _validation_error("Local network targets are not allowed")
-    try:
-        address = ipaddress.ip_address(hostname)
-    except ValueError:
-        address = None
-    if address is not None and not address.is_global:
-        raise _validation_error("Private, loopback, and link-local targets are not allowed")
-
-    scheme = parsed.scheme.lower()
-    default_port = (scheme == "http" and port == 80) or (scheme == "https" and port == 443)
-    display_host = f"[{hostname}]" if ":" in hostname else hostname
-    netloc = display_host if port is None or default_port else f"{display_host}:{port}"
-    root_url = urlunsplit(SplitResult(scheme, netloc, "", "", ""))
-    path = parsed.path.rstrip("/") if parsed.path not in {"", "/"} else ""
-    start_url = urlunsplit(SplitResult(scheme, netloc, path, parsed.query, ""))
-    return NormalizedTarget(domain=hostname, root_url=root_url, start_url=start_url)
+    parsed = urlsplit(start_url)
+    if parsed.hostname is None:
+        raise _validation_error("URL does not contain a hostname")
+    root_url = urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
+    return NormalizedTarget(domain=parsed.hostname, root_url=root_url, start_url=start_url)

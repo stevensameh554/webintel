@@ -4,10 +4,11 @@ WebIntel is a Python web intelligence platform that crawls public company websit
 extracts structured business and technical data, stores it in PostgreSQL, and exposes
 searchable APIs through FastAPI.
 
-The repository currently implements **Phases 1 through 3** of the project plan: the
+The repository currently implements **Phases 1 through 4** of the project plan: the
 application foundation, PostgreSQL and Redis infrastructure, configuration, structured
 logging, health/readiness endpoints, the relational data model, Alembic migrations,
-async repositories, and the crawl-job API with Celery dispatch.
+async repositories, the crawl-job API with Celery dispatch, canonical URL handling,
+and link extraction.
 
 ## Requirements
 
@@ -94,12 +95,31 @@ Celery queue. Queue failures are stored on the job and returned as HTTP `503`. T
 Phase 7 worker is intentionally not started yet, so successfully submitted jobs remain
 queued until the crawler worker is implemented.
 
+## URL And Link Rules
+
+Phase 4 provides reusable crawler services that:
+
+- resolve relative and protocol-relative HTTP(S) links
+- lowercase and IDNA-normalize hostnames
+- remove fragments, default ports, trailing slashes, and common tracking parameters
+- normalize dot segments, percent escapes, and query ordering
+- classify only the exact submitted hostname as internal
+- ignore credentials, unsupported schemes, malformed URLs, and document fragments
+- deduplicate links by normalized URL while retaining the first link text
+- honor valid HTML `<base>` elements
+
+Literal private, loopback, link-local, and metadata-service addresses are rejected.
+`validate_public_url` also rejects a hostname when any DNS answer is non-public. The
+Phase 6 fetcher must run this check for every redirect and bind the validated address
+to the connection; validation followed by an unrelated DNS lookup would remain
+vulnerable to DNS rebinding.
+
 ## Delivery Roadmap
 
 1. Application and infrastructure foundation (implemented)
 2. SQLAlchemy models, Alembic migrations, and repositories (implemented)
 3. Crawl-job API and Celery dispatch (implemented)
-4. URL normalization with SSRF protections and link extraction
+4. URL normalization with SSRF protections and link extraction (implemented)
 5. HTML parsing and business-data extraction
 6. Resilient HTTP fetching and robots.txt enforcement
 7. Crawl worker persistence and failure handling
