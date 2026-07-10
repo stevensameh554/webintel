@@ -27,6 +27,15 @@ class Settings(BaseSettings):
     crawl_queue_name: str = "crawl_jobs"
     database_pool_size: int = Field(default=5, ge=1, le=50)
     readiness_timeout_seconds: float = Field(default=2.0, gt=0, le=10)
+    crawler_user_agent: str = Field(
+        default="WebIntelBot/0.1 (respectful website intelligence crawler)",
+        min_length=1,
+        max_length=256,
+    )
+    fetch_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
+    fetch_retries: int = Field(default=2, ge=0, le=5)
+    fetch_max_redirects: int = Field(default=5, ge=0, le=20)
+    fetch_max_response_bytes: int = Field(default=5_000_000, ge=1_024, le=50_000_000)
 
 
 @lru_cache

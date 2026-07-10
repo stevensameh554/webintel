@@ -129,6 +129,24 @@ vulnerable to DNS rebinding.
 Important-page detection favors navigation hubs. For example, `/careers` is a careers
 page, while `/careers/backend-engineer` is not automatically mislabeled as the hub.
 
+## HTTP Fetching And Robots
+
+Phase 6 provides a reusable async `PageFetcher` with:
+
+- a configurable 10-second timeout and two retries with 1/3-second backoff
+- manual redirects with URL and public-address validation on every hop
+- DNS-rebinding protection that pins each connection to its validated IP address
+- TLS certificate and hostname verification, including for pinned HTTPS connections
+- structured status, final URL, content type, response time, attempt, and redirect data
+- HTML/XHTML decoding with a configurable 5 MB in-memory response limit
+- non-HTML detection without buffering binary response bodies
+- typed timeout, network, redirect-limit, and response-size failures
+
+`RobotsPolicy` fetches `robots.txt` through the same protected transport, caches one
+policy per origin, reports crawl delay directives, and allows crawling when a robots
+file is missing or temporarily unavailable. The Phase 7 worker will check this policy
+before fetching each queued page.
+
 ## Delivery Roadmap
 
 1. Application and infrastructure foundation (implemented)
@@ -136,7 +154,7 @@ page, while `/careers/backend-engineer` is not automatically mislabeled as the h
 3. Crawl-job API and Celery dispatch (implemented)
 4. URL normalization with SSRF protections and link extraction (implemented)
 5. HTML parsing and business-data extraction (implemented)
-6. Resilient HTTP fetching and robots.txt enforcement
+6. Resilient HTTP fetching and robots.txt enforcement (implemented)
 7. Crawl worker persistence and failure handling
 8. Search, filtering, technology detection, CI, and documentation polish
 
